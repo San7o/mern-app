@@ -223,4 +223,258 @@ Now It will automatically restart the server every time we save a change to out 
 
 ---
 
-min 27:12
+Let's visualize in the html page the result of the query
+
+```javascript
+app.get("/", async (req, res) => {
+  // A query
+  // We want to await the query because we don't know how long it will take
+  const allAnimals = await db.collection("animals").find().toArray();
+  res.send(`<p>Welcome to the homepage</p> ${allAnimals.map(animal => `<p>${animal.name} - ${animal.species}</p>`).join('')}`)
+  
+})
+```
+
+Returning a string with some html like this is messy, not organized. Developers would use a template engine such as `ejs`
+
+# Ejs 
+
+```bash 
+npm install ejs
+```
+
+Let's tell express to use ejs
+
+```javascript 
+
+const app = express()
+// Here
+app.set("view engine", "ejs")
+// Set the folder of the views (templates)
+app.set("views", "./views")
+```
+In views/home.js 
+
+```html 
+<h1>Welcome!</h1>
+<ul>
+  <% allAnimals.forEach(function(animal) { %>
+      <li> <%= animal.name %> - <%= animal.species %></li>
+    <% })  %>
+</ul>
+```
+
+The equal sign means that we want to escape the content 
+Now we have the same list as before.
+
+We want the admin to be able to change the data in real time without refreshing the whole page, how do we do that?
+
+To prepare for that, let's create a view for the admin:
+
+views/admin.js
+```html 
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="UTF-8">
+<title>Page Title</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="">
+<style>
+</style>
+<script src=""></script>
+<body>
+  <div id="app"></div>
+  <script src="/main.js"></script>
+<
+</body>
+</html>
+```
+server.js
+```javascript 
+app.get("/admin", (req, res) => {
+  res.render("admin")
+})
+```
+
+Let's create a new folder called `public` with a file called `main.js`
+Inside main.js let's just
+```javascript
+alert(1)
+```
+
+Let's add this in server.js 
+```javascript 
+app.set("views", "./views")
+app.use(express.static("public"))
+```
+
+Let's create src/index.js
+
+Now in main.js we are writing actual javascript code that will be run in admin.ejs!
+We have prepared for using react.
+
+## React 
+
+Server side rendering will only get us so far, but in the modern age we need a way to update the page instead of refreshing the whole page. Here is where React steps is.
+
+```bash 
+npm install react react-dom @babel/core @babel/presec-react babel/loader webpack webpack-cli webpack-node-externals npm-run-all 
+```
+
+The key of all of this is webpack, let's create a configuration file in the root directory called `webpack.config.js` with this content 
+
+```javascript
+const nodeExternals = require("webpack-node-externals")
+const path = require("path")
+
+const typicalReact = {
+  rules: [
+    {
+      test: /\.js$/,
+      exclude: /(node_modules)/,
+      use: {
+        loader: "babel-loader",
+        options: {
+          presets: ["@babel/preset-react"]
+        }
+      }
+    }
+  ]
+}
+
+const clientConfig = {
+  entry: "./src/index.js",
+  output: {
+    path: path.resolve(__dirname, "public"),
+    filename: "main.js"
+  },
+  mode: "development",
+  module: typicalReact
+}
+
+const serverConfig = {
+  entry: "./server.js",
+  output: {
+    path: __dirname,
+    filename: "server-compiled.js"
+  },
+  externals: [nodeExternals()],
+  target: "node",
+  mode: "production",
+  module: typicalReact
+}
+
+module.exports = [clientConfig, serverConfig]
+```
+
+We are loading the tools to convert jsx into regular javascript, the index is localted into /src/index.js, that we want to output it into the public folder and call it main.js 
+
+Let's add this entries to scripts in the `package.json`
+
+```json
+  "scripts": {
+    "dev": "run-p ourserver ourwebpack",
+    "ourwebpack": "webpack --watch",
+ 
+```
+Now we can run with 
+
+```bash
+npm run dev
+```
+
+Finally, we are writing a bit of react. Inside stc/index.js 
+```javascript
+import React from "react"
+import {createRoot} from "react-dom/client"
+
+// The main app
+function App() {
+  
+  return (
+    <div>
+      <h1>Hello</h1>
+      <p>Hey, this is from react</p>
+    </div>
+  )
+}
+
+// Everything will be rendered wher the app id is set 
+const root = createRoot(document.querySelector("#app"))
+root.render(<App />)
+```
+
+We are writing a special form of html, called jsx, but the browser can't understand it. So webpack will convert this code and convert it into regular javascript
+
+Let's output some content 
+```javascript 
+// The main app
+function App() {
+ 
+  const animals = [{name: "miao", species: "cat"}, {name: "bau", species: "dog"}]
+
+  return (
+    <div>
+      <h1>Hello</h1>
+      <p>Hey, this is from react</p>
+      {animals.map(function(animal) {
+        return <AnimalCard name={animal.name} species={animal.species}/>
+      })}
+    </div>
+  )
+}
+
+function AnimalCard(props) {
+  return <p>Hi, my name is {props.name} and I am a {props.species}</p>
+}
+```
+
+Let's use the actual data from the query. We can create a new route to get the result of the query 
+```javascript
+app.get("/api/animals", async (req, res) => {
+  const allAnimals = await db.collection("animals").find().toArray();
+  // This will send raw json
+  res.json(allAnimals)
+})
+```
+To pass the values to react, there are many ways, we are gonna use axios
+
+```bash
+npm install axios
+```
+
+```javascript 
+import React, {useState, useEffect} from "react"
+import {createRoot} from "react-dom/client"
+import Axios from "axios"
+
+// The main app
+function App() {
+ 
+  // const animals = [{name: "miao", species: "cat"}, {name: "bau", species: "dog"}]
+  
+  // the animals and the function to set those will be empty at the start 
+  const [animals, setAnimals] = useState([])
+
+  // update the animals
+  useEffect(() => {
+    async function go() {
+      const response = await Axios.get("/api/animals")
+      setAnimals(response.data)
+    }
+    go()
+  }, [])
+
+  return (
+    <div>
+      <h1>Hello</h1>
+      <p>Hey, this is from react</p>
+      {animals.map(function(animal) {
+        return <AnimalCard name={animal.name} species={animal.species}/>
+      })}
+    </div>
+  )
+}
+```
+
+min 1:00:09

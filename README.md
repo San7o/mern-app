@@ -476,5 +476,88 @@ function App() {
   )
 }
 ```
+---
 
-min 1:00:09
+Let's include some css
+
+In public/my-custom.css
+```css
+.animal-grid {
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px 30px;
+}
+
+.our-card-top {
+  position: relative;
+}
+
+.our-custom-input {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: rgba(0, 0, 0, 0.65);
+}
+
+.our-custom-input-interior {
+  position: absolute;
+  top: 50%;
+  left: 15px;
+  right: 15px;
+  transform: translateY(-50%);
+}
+```
+
+In admin.ejs
+```html
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+<link rel="stylesheet" href="/my-custom.css">
+```
+And add a fallback photo for the animals in public/
+
+Copy the react components inside src/components/AnimalCard.js and src/components/CreateNewForm.js 
+
+index.js 
+```javascript 
+import React, {useState, useEffect} from "react"
+import {createRoot} from "react-dom/client"
+import Axios from "axios"
+import CreateNewForm from "./components/CreateNewForm"
+import AnimalCard from "./components/AnimalCard"
+
+// The main app
+function App() {
+ 
+  // const animals = [{name: "miao", species: "cat"}, {name: "bau", species: "dog"}]
+  
+  // the animals and the function to set those will be empty at the start 
+  const [animals, setAnimals] = useState([])
+
+  // update the animals
+  useEffect(() => {
+    async function go() {
+      const response = await Axios.get("/api/animals")
+      setAnimals(response.data)
+    }
+    go()
+  }, [])
+  
+  return (
+    <div className="container">
+      <p>
+        <a href="/">&laquo; Back to public homepage</a>
+      </p>
+      <CreateNewForm setAnimals={setAnimals} />
+      <div className="animal-grid">
+        {animals.map(function (animal) {
+          return <AnimalCard key={animal._id} name={animal.name} species={animal.species} photo={animal.photo} id={animal._id} setAnimals={setAnimals} />
+        })}
+      </div>
+    </div>
+  )
+}
+```
+
